@@ -67,6 +67,9 @@ final class Kernel extends BaseKernel
 
     public static ?FakeIngest $ingest = null;
 
+    /** @var array<string, mixed> the fixwire configuration of a test, over the tests' own */
+    public static array $fixwire = [];
+
     public function registerBundles(): iterable
     {
         return [new FrameworkBundle(), new SecurityBundle(), new DoctrineBundle(), new FixwireBundle()];
@@ -79,7 +82,8 @@ final class Kernel extends BaseKernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/fixwire-symfony-tests/' . md5(__DIR__) . '/cache';
+        // A container of its own for a test's configuration.
+        return sys_get_temp_dir() . '/fixwire-symfony-tests/' . md5(__DIR__ . serialize(self::$fixwire)) . '/cache';
     }
 
     public function getLogDir(): string
@@ -108,7 +112,7 @@ final class Kernel extends BaseKernel
             'access_control' => [['path' => '^/admin', 'roles' => 'ROLE_ADMIN']],
         ]);
         $container->extension('doctrine', ['dbal' => ['driver' => 'pdo_sqlite', 'memory' => true]]);
-        $container->extension('fixwire', [
+        $container->extension('fixwire', self::$fixwire + [
             'dsn' => 'http://publickey@ingest.test',
             'release' => 'shop@1.0.0',
             'traces_sample_rate' => 1.0,

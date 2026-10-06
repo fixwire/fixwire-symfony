@@ -38,9 +38,35 @@ final class SymfonyTest extends WebTestCase
         $this->browser->disableReboot();
     }
 
+    protected function tearDown(): void
+    {
+        Kernel::$fixwire = [];
+        parent::tearDown();
+    }
+
     protected static function getKernelClass(): string
     {
         return Kernel::class;
+    }
+
+    public function testABrokenConfigurationLeavesFixwireOffAndTheKernelRunning(): void
+    {
+        self::ensureKernelShutdown();
+        Hub::setCurrent(new Hub());
+        Kernel::$fixwire = ['dsn' => 'ingest.test', 'options' => ['capture_uncaught' => false, 'sample_rat' => 0.5]];
+        $log = (string) tempnam(sys_get_temp_dir(), 'fixwire-log');
+        $previous = ini_set('error_log', $log);
+        try {
+            $browser = static::createClient();
+            $browser->request('GET', '/orders/7');
+            self::assertSame(500, $browser->getResponse()->getStatusCode());
+        } finally {
+            ini_set('error_log', $previous === false ? '' : $previous);
+        }
+        self::assertFalse(Hub::current()->getClient()?->isEnabled() ?? true);
+        self::assertSame([], $this->ingest()->received);
+        self::assertStringContainsString("fixwire: nothing is sent: no option 'sample_rat'; the DSN must look like https://<key>@<host>", (string) file_get_contents($log));
+        unlink($log);
     }
 
     private function ingest(): FakeIngest

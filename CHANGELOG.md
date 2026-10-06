@@ -6,6 +6,7 @@ API.
 
 ## [Unreleased]
 
+- A malformed `dsn` or an unknown key under `options` no longer stops the kernel from booting: it is said on PHP's error log and Fixwire stays off.
 - `trace_propagation_targets` are URL prefixes or hosts with their subdomains (fixwire/fixwire's rules); `options` takes the SDK's new limits (`max_value_length`, `max_stack_frames`).
 
 ## [0.1.0] - 2026-10-06
