@@ -11,9 +11,15 @@ use Fixwire\Symfony\EventListener\RequestListener;
 use Fixwire\Symfony\HttpClient\TracingHttpClient;
 use Fixwire\Symfony\Messenger\MessengerListener;
 use Fixwire\Symfony\Routing\RoutePatterns;
+use Symfony\Component\Config\Definition\ArrayNode;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
+use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
+use Symfony\Component\Config\Definition\Exception\Exception as ConfigException;
+use Symfony\Component\Config\Definition\NodeInterface;
+use Symfony\Component\Config\Definition\PrototypedArrayNode;
 use Symfony\Component\Console\ConsoleEvents;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
@@ -38,12 +44,23 @@ final class FixwireBundle extends AbstractBundle
 {
     protected string $extensionAlias = 'fixwire';
 
+    /** @var array<string, NodeInterface>|null the nodes of the configuration's keys, to check values with */
+    private static ?array $nodes = null;
+
     public function configure(DefinitionConfigurator $definition): void
     {
         $root = $definition->rootNode();
         if (!$root instanceof ArrayNodeDefinition) {
             return;
         }
+        // Lenient, as the SDK's init() is: what the tree refuses would stop the container from
+        // compiling (for some apps on their first request), so it is said and left out instead.
+        $root->beforeNormalization()->always(static fn(mixed $config): array => self::lenient($config, self::nodes(), ''))->end();
+        self::define($root);
+    }
+
+    private static function define(ArrayNodeDefinition $root): void
+    {
         $node = $root->children();
         $node->scalarNode('dsn')->defaultValue('%env(default::FIXWIRE_DSN)%')->info('Where to send; nothing is sent without one');
         $node->scalarNode('release')->defaultValue('%env(default::FIXWIRE_RELEASE)%')->info('The app\'s version, such as shop@1.4.0');
@@ -61,6 +78,85 @@ final class FixwireBundle extends AbstractBundle
         }
         foreach (['queries', 'http_client', 'messenger'] as $name) {
             $tracing->booleanNode($name)->defaultTrue();
+        }
+    }
+
+    /**
+     * The nodes of the configuration's keys, built apart: each checks a value as the tree will,
+     * environment variables included.
+     *
+     * @return array<string, NodeInterface>
+     */
+    private static function nodes(): array
+    {
+        if (self::$nodes === null) {
+            $tree = new TreeBuilder('fixwire');
+            $root = $tree->getRootNode();
+            if ($root instanceof ArrayNodeDefinition) {
+                self::define($root);
+            }
+            $built = $tree->buildTree();
+            self::$nodes = $built instanceof ArrayNode ? $built->getChildren() : [];
+        }
+
+        return self::$nodes;
+    }
+
+    /**
+     * A configuration without what the tree would refuse: a key it doesn't have, a value of the
+     * wrong type. Each is said on PHP's error log, as the SDK says a broken option, and left out:
+     * it takes its default.
+     *
+     * @param array<string, NodeInterface> $nodes
+     *
+     * @return array<int|string, mixed>
+     */
+    private static function lenient(mixed $config, array $nodes, string $path): array
+    {
+        if (!\is_array($config)) {
+            if ($config !== null) { // fixwire: true, say
+                error_log("fixwire: the configuration can't be " . get_debug_type($config) . ', ignored');
+            }
+
+            return [];
+        }
+        foreach ($config as $key => $value) {
+            $name = $path . $key;
+            $node = $nodes[$key] ?? null;
+            if ($node === null) {
+                error_log("fixwire: no option '{$name}', ignored");
+                unset($config[$key]);
+            } elseif ($node instanceof PrototypedArrayNode && \is_array($value)) {
+                // A list: its items one by one.
+                $list = array_is_list($value);
+                foreach ($value as $i => $item) {
+                    if (!self::takes($node->getPrototype(), $item)) {
+                        error_log("fixwire: option '{$name}.{$i}' can't be " . get_debug_type($item) . ', ignored');
+                        unset($value[$i]);
+                    }
+                }
+                $config[$key] = $list ? array_values($value) : $value;
+            } elseif ($node instanceof ArrayNode && (\is_array($value) || $value === null)) {
+                $config[$key] = self::lenient($value, $node->getChildren(), $name . '.');
+            } elseif (!self::takes($node, $value) || ($key === 'options' && !\is_array($value) && $value !== null)) {
+                // options: the SDK's other options, a map (the SDK checks them).
+                error_log("fixwire: option '{$name}' can't be " . get_debug_type($value) . ', ignored');
+                unset($config[$key]);
+            }
+        }
+
+        return $config;
+    }
+
+    /** Whether a node takes a value: an environment variable as one of the type it gives. */
+    private static function takes(NodeInterface $node, mixed $value): bool
+    {
+        try {
+            $node->normalize($value);
+
+            return true;
+        } catch (ConfigException) {
+            return false;
         }
     }
 
@@ -124,6 +220,21 @@ final class FixwireBundle extends AbstractBundle
             // For config/packages/monolog.yaml: a handler of type service with this id.
             $services->set(MonologHandler::class);
         }
+    }
+
+    public function build(ContainerBuilder $container): void
+    {
+        parent::build($container);
+        // A before_send naming no service is said and left out, rather than failing the compile.
+        $container->addCompilerPass(new class implements CompilerPassInterface {
+            public function process(ContainerBuilder $container): void
+            {
+                if ($container->hasAlias('fixwire.before_send') && !$container->has($id = (string) $container->getAlias('fixwire.before_send'))) {
+                    $container->removeAlias('fixwire.before_send');
+                    error_log("fixwire: no service '{$id}' for before_send, ignored");
+                }
+            }
+        });
     }
 
     public function boot(): void

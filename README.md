@@ -65,9 +65,13 @@ fixwire:
     #     redact: false       # turn off on-device masking of secrets and personal data
 ```
 
-`bin/console config:dump-reference fixwire` lists everything. A malformed
-DSN or an unknown key under `options` never stops the kernel from booting:
-it is said on PHP's error log and Fixwire stays off.
+`bin/console config:dump-reference fixwire` lists everything. Nothing in
+it stops the container from compiling or the kernel from booting. A key
+the bundle doesn't have, a value of the wrong type, or a `before_send`
+naming no service is said on PHP's error log when the container is built
+(`fixwire: no option 'x', ignored`) and left out, its default taken. A
+malformed DSN or an unknown key under `options` is said there too, and
+Fixwire stays off.
 
 ### Quick usage example
 

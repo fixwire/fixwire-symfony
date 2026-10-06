@@ -6,6 +6,7 @@ API.
 
 ## [Unreleased]
 
+- An unknown key under `fixwire:` (or `breadcrumbs` and `tracing`), a value of the wrong type, or a `before_send` naming no service no longer stops the container from compiling: each is said on PHP's error log (`fixwire: no option 'x', ignored`) and left out, its default taken.
 - A malformed `dsn` or an unknown key under `options` no longer stops the kernel from booting: it is said on PHP's error log and Fixwire stays off.
 - `trace_propagation_targets` are URL prefixes or hosts with their subdomains (fixwire/fixwire's rules); `options` takes the SDK's new limits (`max_value_length`, `max_stack_frames`).
 

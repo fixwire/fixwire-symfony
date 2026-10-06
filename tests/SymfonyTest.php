@@ -6,13 +6,17 @@ namespace Fixwire\Symfony\Tests;
 
 use Fixwire\Client;
 use Fixwire\Hub;
+use Fixwire\Symfony\FixwireBundle;
 use Fixwire\Symfony\Messenger\TraceStamp;
 use Fixwire\Symfony\Tests\App\Kernel;
 use Fixwire\Symfony\Tests\App\Recorded;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Config\Definition\ConfigurationInterface;
+use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Console\Tester\ApplicationTester;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Messenger\EventListener\StopWorkerOnMessageLimitListener;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -67,6 +71,90 @@ final class SymfonyTest extends WebTestCase
         self::assertSame([], $this->ingest()->received);
         self::assertStringContainsString("fixwire: nothing is sent: no option 'sample_rat'; the DSN must look like https://<key>@<host>", (string) file_get_contents($log));
         unlink($log);
+    }
+
+    public function testSaysAndIgnoresWhatTheConfigurationTreeRefuses(): void
+    {
+        self::ensureKernelShutdown();
+        Hub::setCurrent(new Hub());
+        $_SERVER['FIXWIRE_TEST_TRACES'] = '1';
+        Kernel::$fixwire = [
+            'dns' => 'http://publickey@elsewhere.test', // a typo of dsn
+            'send_default_pii' => 'yes',
+            'traces_sample_rate' => '%env(float:FIXWIRE_TEST_TRACES)%', // the type an environment variable gives
+            'trace_propagation_targets' => ['inventory.test', ['rates.example.com']],
+            'breadcrumbs' => ['queries' => false, 'http' => true],
+            'tracing' => 'off',
+            'before_send' => 'app.no_such_service',
+        ];
+        $log = (string) tempnam(sys_get_temp_dir(), 'fixwire-log');
+        $previous = ini_set('error_log', $log);
+        try {
+            $browser = static::createClient();
+            $browser->request('GET', '/orders/7', server: ['PHP_AUTH_USER' => 'ada', 'PHP_AUTH_PW' => 'secret']);
+            self::assertSame(500, $browser->getResponse()->getStatusCode());
+        } finally {
+            ini_set('error_log', $previous === false ? '' : $previous);
+            unset($_SERVER['FIXWIRE_TEST_TRACES']);
+        }
+        $said = (string) file_get_contents($log);
+        unlink($log);
+        foreach ([
+            "no option 'dns'",
+            "option 'send_default_pii' can't be string",
+            "option 'trace_propagation_targets.1' can't be array",
+            "no option 'breadcrumbs.http'",
+            "option 'tracing' can't be string",
+            "no service 'app.no_such_service' for before_send",
+        ] as $line) {
+            self::assertStringContainsString("fixwire: {$line}, ignored\n", $said);
+        }
+        self::assertStringNotContainsString('traces_sample_rate', $said);
+        self::assertStringNotContainsString('nothing is sent', $said);
+
+        // Fixwire is on, with the rest of the configuration and the defaults of what was ignored.
+        $client = Hub::current()->getClient();
+        self::assertTrue($client?->isEnabled());
+        self::assertSame([false, ['inventory.test'], 1.0], [$client->options()->sendDefaultPii, $client->options()->tracePropagationTargets, $client->options()->tracesSampleRate]);
+        $events = $this->ingest()->events();
+        self::assertCount(1, $events);
+        self::assertNotContains('db.query', array_column($events[0]['fixwire.breadcrumbs'] ?? [], 'category'), 'breadcrumbs.queries: false');
+        self::assertNotNull($this->ingest()->span('select ? as id'), 'traced: tracing as by default');
+    }
+
+    public function testTakesNothingItCannotUseFromTheConfiguration(): void
+    {
+        $configuration = (new FixwireBundle())->getContainerExtension()?->getConfiguration([], new ContainerBuilder());
+        self::assertInstanceOf(ConfigurationInterface::class, $configuration);
+        $log = (string) tempnam(sys_get_temp_dir(), 'fixwire-log');
+        $previous = ini_set('error_log', $log);
+        try {
+            // Each file under config/packages is read on its own, then they are merged.
+            $config = (new Processor())->processConfiguration($configuration, [
+                ['options' => 'debug', 'traces_sample_rate' => 0.5, 'breadcrumbs' => ['queries' => 'no'], 'trace_propagation_targets' => 'example.com'],
+                ['breadcrumbs' => ['commands' => false], 'environment' => ['staging'], 'tracing' => ~0],
+                true,
+                ['before_send' => null, 'auto_session_tracking' => null, 'traces_sample_rate' => null],
+            ]);
+        } finally {
+            ini_set('error_log', $previous === false ? '' : $previous);
+        }
+        $said = (string) file_get_contents($log);
+        unlink($log);
+        self::assertSame([
+            "fixwire: option 'options' can't be string, ignored",
+            "fixwire: option 'breadcrumbs.queries' can't be string, ignored",
+            "fixwire: option 'trace_propagation_targets' can't be string, ignored",
+            "fixwire: option 'environment' can't be array, ignored",
+            "fixwire: option 'tracing' can't be int, ignored",
+            "fixwire: the configuration can't be bool, ignored",
+            "fixwire: option 'traces_sample_rate' can't be null, ignored",
+        ], array_map(static fn(string $line): string => (string) preg_replace('/^\[[^]]+\] /', '', $line), array_values(array_filter(explode("\n", $said)))));
+        self::assertSame([[], 0.5, null, [], null, true], [
+            $config['options'], $config['traces_sample_rate'], $config['environment'], $config['trace_propagation_targets'], $config['before_send'], $config['auto_session_tracking'],
+        ], 'null is true for a switch, as in any Symfony configuration');
+        self::assertEquals(['queries' => true, 'commands' => false, 'messenger' => true], $config['breadcrumbs']);
+        self::assertEquals(['queries' => true, 'http_client' => true, 'messenger' => true], $config['tracing']);
     }
 
     private function ingest(): FakeIngest
