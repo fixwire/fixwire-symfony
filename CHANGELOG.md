@@ -4,6 +4,10 @@ All notable changes to Fixwire for Symfony are listed here. Versions follow [Sem
 Versioning](https://semver.org); before 1.0, a minor version may change the
 API.
 
+## [Unreleased]
+
+- `trace_propagation_targets` are URL prefixes or hosts with their subdomains (fixwire/fixwire's rules); `options` takes the SDK's new limits (`max_value_length`, `max_stack_frames`).
+
 ## [0.1.0] - 2026-10-06
 
 First release.

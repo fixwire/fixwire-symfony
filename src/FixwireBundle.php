@@ -49,7 +49,7 @@ final class FixwireBundle extends AbstractBundle
         $node->scalarNode('release')->defaultValue('%env(default::FIXWIRE_RELEASE)%')->info('The app\'s version, such as shop@1.4.0');
         $node->scalarNode('environment')->defaultNull()->info('Where the app runs; the kernel\'s environment when not set');
         $node->floatNode('traces_sample_rate')->defaultValue(0.0)->info('The share of new traces kept');
-        $node->arrayNode('trace_propagation_targets')->info('URLs outgoing requests carry trace headers to')->scalarPrototype();
+        $node->arrayNode('trace_propagation_targets')->info('Where outgoing requests carry trace headers: a URL prefix (https://api.example.com/v2), or a host and its subdomains (example.com)')->scalarPrototype();
         $node->booleanNode('send_default_pii')->defaultFalse()->info('Send the user\'s email and IP address and identifying request headers');
         $node->booleanNode('auto_session_tracking')->defaultFalse()->info('A session per request, for release health (one more request to Fixwire per request)');
         $node->scalarNode('before_send')->defaultNull()->info('A service id: an invokable that changes an event or drops it by returning null');
