@@ -1,0 +1,40 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    http_method_override: false
+    handle_all_throwables: true
+    php_errors:
+        log: true
+    http_client:
+        scoped_clients:
+            inventory.client:
+                base_uri: '%env(INVENTORY_URL)%'
+    messenger:
+        transports:
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                retry_strategy:
+                    max_retries: 0
+        routing:
+            App\Message\SendInvoice: async
+
+doctrine:
+    dbal:
+        url: '%env(resolve:DATABASE_URL)%'
+
+security:
+    password_hashers:
+        Symfony\Component\Security\Core\User\InMemoryUser: plaintext
+    providers:
+        users:
+            memory:
+                users:
+                    ada: { password: secret, roles: [ROLE_USER] }
+                    grace: { password: secret, roles: [ROLE_USER] }
+    firewalls:
+        main:
+            lazy: true
+            stateless: true
+            http_basic: true
+            provider: users
+    access_control:
+        - { path: ^/orders$, methods: [POST], roles: ROLE_USER }

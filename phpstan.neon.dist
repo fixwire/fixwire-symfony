@@ -1,0 +1,9 @@
+parameters:
+    level: 8
+    phpVersion:
+        min: 80100
+        max: 80599
+    # One code base for Symfony 6.4 to 8: what one version types precisely, another does not.
+    treatPhpDocTypesAsCertain: false
+    paths:
+        - src

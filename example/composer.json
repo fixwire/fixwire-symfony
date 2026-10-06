@@ -1,0 +1,57 @@
+{
+  "name": "fixwire/symfony-example",
+  "description": "A Symfony app reporting to Fixwire, run against a fake ingest by its test",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.1",
+    "doctrine/dbal": "^3.8 || ^4.0",
+    "doctrine/doctrine-bundle": "^2.11 || ^3.0",
+    "fixwire/fixwire": "*@dev",
+    "fixwire/symfony": "*@dev",
+    "symfony/console": "^6.4 || ^7.0 || ^8.0",
+    "symfony/doctrine-messenger": "^6.4 || ^7.0 || ^8.0",
+    "symfony/dotenv": "^6.4 || ^7.0 || ^8.0",
+    "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
+    "symfony/http-client": "^6.4 || ^7.0 || ^8.0",
+    "symfony/messenger": "^6.4 || ^7.0 || ^8.0",
+    "symfony/runtime": "^6.4 || ^7.0 || ^8.0",
+    "symfony/security-bundle": "^6.4 || ^7.0 || ^8.0",
+    "symfony/yaml": "^6.4 || ^7.0 || ^8.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5 || ^11.5 || ^12.0"
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/fixwire/fixwire-php"
+    },
+    {
+      "type": "path",
+      "url": "..",
+      "options": {
+        "versions": {
+          "fixwire/symfony": "0.1.x-dev"
+        }
+      }
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "symfony/runtime": true
+    },
+    "lock": false,
+    "sort-packages": true
+  }
+}
