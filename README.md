@@ -1,5 +1,7 @@
 # Fixwire for Symfony
 
+[![CI](https://github.com/fixwire/fixwire-symfony/actions/workflows/ci.yml/badge.svg)](https://github.com/fixwire/fixwire-symfony/actions/workflows/ci.yml)
+
 Fixwire in a Symfony 6.4, 7 or 8 app (PHP 8.1+): the exceptions the kernel
 handles, each request as a trace named after its route, the signed-in user,
 console commands, Messenger workers, Doctrine queries, the HTTP client, and
