@@ -64,11 +64,11 @@ final class ExampleTest extends TestCase
         $ada = 'Authorization: Basic ' . base64_encode('ada:secret');
         $grace = 'Authorization: Basic ' . base64_encode('grace:secret');
 
-        self::assertSame(200, $this->http('GET', "{$base}/orders/7", null, [])[0]);
-        self::assertSame(401, $this->http('POST', "{$base}/orders", '{"sku":"sku_1","card":"4242424242424242"}', $json)[0]);
-        self::assertSame(201, $this->http('POST', "{$base}/orders", '{"sku":"sku_1","card":"4242424242424242"}', [...$json, $ada])[0]);
-        self::assertSame(402, $this->http('POST', "{$base}/orders", '{"sku":"sku_2","card":"4000000000000002"}', [...$json, $grace])[0]);
-        self::assertSame(500, $this->http('GET', "{$base}/admin/report", null, [])[0]);
+        $this->assertAnswered(200, $this->http('GET', "{$base}/orders/7", null, []));
+        $this->assertAnswered(401, $this->http('POST', "{$base}/orders", '{"sku":"sku_1","card":"4242424242424242"}', $json));
+        $this->assertAnswered(201, $this->http('POST', "{$base}/orders", '{"sku":"sku_1","card":"4242424242424242"}', [...$json, $ada]));
+        $this->assertAnswered(402, $this->http('POST', "{$base}/orders", '{"sku":"sku_2","card":"4000000000000002"}', [...$json, $grace]));
+        $this->assertAnswered(500, $this->http('GET', "{$base}/admin/report", null, []));
         $requests = $this->received(12); // a trace and a session per request, the two errors
 
         $events = $this->events($requests);
@@ -256,6 +256,33 @@ final class ExampleTest extends TestCase
             \array_key_exists('kvlistValue', $v) => self::kv($v['kvlistValue']['values'] ?? []),
             default => null,
         };
+    }
+
+    /**
+     * Fails with what the app answered and what it reported, when the status isn't the one expected.
+     *
+     * @param array{int, string} $answer
+     */
+    private function assertAnswered(int $status, array $answer): void
+    {
+        if ($answer[0] === $status) {
+            $this->addToAssertionCount(1);
+
+            return;
+        }
+        usleep(500_000); // the app sends what it captured once it has answered
+        $reported = [];
+        foreach (array_filter(explode("\n", (string) file_get_contents($this->ingest))) as $line) {
+            foreach (json_decode($line, true)['body']['resourceLogs'] ?? [] as $rl) {
+                foreach ($rl['scopeLogs'] as $sl) {
+                    foreach ($sl['logRecords'] as $rec) {
+                        $a = array_column($rec['attributes'], 'value', 'key');
+                        $reported[] = ($a['exception.type']['stringValue'] ?? 'message') . ': ' . ($a['exception.message']['stringValue'] ?? '');
+                    }
+                }
+            }
+        }
+        self::fail("answered {$answer[0]}, not {$status}: " . substr($answer[1], 0, 500) . "\nreported: " . implode("\n          ", $reported));
     }
 
     /**
