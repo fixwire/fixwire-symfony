@@ -83,6 +83,23 @@ final class SymfonyTest extends WebTestCase
         self::assertContains(['key' => 'deployment.environment.name', 'value' => ['stringValue' => 'test']], $resource);
     }
 
+    public function testRequestsOfOneKernelDoNotLeakIntoEachOther(): void
+    {
+        // One kernel serving request after request, as under a worker runtime.
+        \Fixwire\addBreadcrumb('worker', 'booted');
+        $this->browser->request('GET', '/orders/7', server: ['PHP_AUTH_USER' => 'ada', 'PHP_AUTH_PW' => 'secret']);
+        $this->browser->request('GET', '/orders/8');
+
+        $events = $this->ingest()->events();
+        self::assertCount(2, $events);
+        self::assertSame(['worker', 'db.query'], array_column($events[0]['fixwire.breadcrumbs'], 'category'));
+        self::assertSame('ada', $events[0]['user.id']);
+        self::assertSame(['db.query'], array_column($events[1]['fixwire.breadcrumbs'], 'category'), 'only its own');
+        self::assertArrayNotHasKey('user.id', $events[1], "not the previous request's user");
+        self::assertNotSame($events[0]['traceId'], $events[1]['traceId']);
+        self::assertNull(Hub::current()->getScope()->getTransaction(), 'the scopes ended');
+    }
+
     public function testLeavesOutClientErrors(): void
     {
         $this->browser->request('GET', '/missing');

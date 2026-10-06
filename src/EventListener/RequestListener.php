@@ -36,6 +36,9 @@ final class RequestListener implements EventSubscriberInterface
 
     private bool $pushed = false;
 
+    /** Requests this kernel served: under a worker runtime (FrankenPHP, RoadRunner), many. */
+    private int $served = 0;
+
     public function __construct(private RoutePatterns $routes, private ?TokenStorageInterface $tokens = null) {}
 
     public static function getSubscribedEvents(): array
@@ -59,6 +62,10 @@ final class RequestListener implements EventSubscriberInterface
         $request = $event->getRequest();
         $scope = $hub->pushScope();
         $this->pushed = true;
+        if ($this->served++ > 0) {
+            // What happened while the worker booted belongs to its first request only.
+            $scope->clearBreadcrumbs();
+        }
         if ($this->tokens !== null) {
             $tokens = $this->tokens;
             $pii = $client->options()->sendDefaultPii;

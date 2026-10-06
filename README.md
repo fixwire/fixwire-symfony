@@ -66,9 +66,11 @@ fixwire:
   `trace_propagation_targets`. Requests stay asynchronous.
 
 What was captured is sent at the end of the request, in `kernel.terminate`.
-Under PHP-FPM that happens after the response has gone out. Route paths are
-read from a file built when the cache is warmed, so naming a span costs
-nothing.
+Under PHP-FPM that happens after the response has gone out. Under a worker
+runtime (FrankenPHP, RoadRunner), where one kernel serves request after
+request, each request still has its own scope, user and breadcrumbs. Route
+paths are read from a file built when the cache is warmed, so naming a span
+costs nothing.
 
 ## Logs
 
