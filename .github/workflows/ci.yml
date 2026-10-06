@@ -36,6 +36,10 @@ jobs:
           extensions: curl, fileinfo, mbstring, zlib, pdo_sqlite
           coverage: none
           tools: composer:v2
+      # The bundle is built next to the core's main branch, so it is tested against it; the
+      # version it requires (^0.1) is what a release of both pins.
+      - name: the core's main branch
+        run: composer require --no-update "fixwire/fixwire:dev-main as 0.1.99"
       - run: composer update --no-progress ${{ matrix.with }}
       - run: composer check-format
       - run: composer analyse
