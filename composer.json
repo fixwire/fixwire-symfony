@@ -15,7 +15,7 @@
   ],
   "require": {
     "php": ">=8.1",
-    "fixwire/fixwire": "^0.1",
+    "fixwire/fixwire": "^0.1.1",
     "symfony/config": "^6.4 || ^7.0 || ^8.0",
     "symfony/dependency-injection": "^6.4 || ^7.0 || ^8.0",
     "symfony/event-dispatcher": "^6.4 || ^7.0 || ^8.0",

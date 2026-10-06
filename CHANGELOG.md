@@ -4,7 +4,7 @@ All notable changes to Fixwire for Symfony are listed here. Versions follow [Sem
 Versioning](https://semver.org); before 1.0, a minor version may change the
 API.
 
-## [Unreleased]
+## [0.1.1] - 2026-10-06
 
 - An unknown key under `fixwire:` (or `breadcrumbs` and `tracing`), a value of the wrong type, or a `before_send` naming no service no longer stops the container from compiling: each is said on PHP's error log (`fixwire: no option 'x', ignored`) and left out, its default taken.
 - A malformed `dsn` or an unknown key under `options` no longer stops the kernel from booting: it is said on PHP's error log and Fixwire stays off.
