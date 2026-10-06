@@ -12,7 +12,9 @@ php bin/console messenger:consume async     # the worker, in another terminal
 ```
 
 (`variables_order=EGPCS` lets the built-in server pass the environment to
-the app, so it wins over `.env`. PHP-FPM passes it anyway.)
+the app, so it wins over the defaults in `.env.example`, which
+`extra.runtime.dotenv_path` in `composer.json` points Symfony at. PHP-FPM
+passes the environment anyway.)
 
 It reserves stock at an inventory service (`INVENTORY_URL`, default
 `http://localhost:8081`) and sends invoices through Messenger (a Doctrine

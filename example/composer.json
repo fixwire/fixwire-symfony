@@ -47,6 +47,11 @@
       "Tests\\": "tests/"
     }
   },
+  "extra": {
+    "runtime": {
+      "dotenv_path": ".env.example"
+    }
+  },
   "config": {
     "allow-plugins": {
       "symfony/runtime": true
