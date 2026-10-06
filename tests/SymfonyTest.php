@@ -97,7 +97,7 @@ final class SymfonyTest extends WebTestCase
             ini_set('error_log', $previous === false ? '' : $previous);
             unset($_SERVER['FIXWIRE_TEST_TRACES']);
         }
-        $said = (string) file_get_contents($log);
+        $said = str_replace("\r\n", "\n", (string) file_get_contents($log)); // error_log ends lines with PHP_EOL
         unlink($log);
         foreach ([
             "no option 'dns'",
@@ -139,7 +139,7 @@ final class SymfonyTest extends WebTestCase
         } finally {
             ini_set('error_log', $previous === false ? '' : $previous);
         }
-        $said = (string) file_get_contents($log);
+        $said = str_replace("\r\n", "\n", (string) file_get_contents($log)); // error_log ends lines with PHP_EOL
         unlink($log);
         self::assertSame([
             "fixwire: option 'options' can't be string, ignored",
